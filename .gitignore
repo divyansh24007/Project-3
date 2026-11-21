@@ -1,0 +1,144 @@
+# ==============================================================================
+# AEGISOS Cybersecurity Platform - .gitignore
+# Comprehensive rules for Python, Node.js/Next.js, Android, Supabase & IDEs
+# ==============================================================================
+
+# --- Environment & Secret Configuration ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+# Virtual Environments
+.env/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+/lib/
+/lib64/
+!frontend/src/lib/
+
+# Python Testing & Typing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.mypy_cache/
+.pytype/
+.ruff_cache/
+cython_debug/
+
+# Jupyter Notebook Checkpoints
+.ipynb_checkpoints
+
+# --- Node.js & Next.js ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-store/
+
+# Next.js build output
+.next/
+out/
+.turbo/
+.vercel/
+
+# TypeScript declarations & cache
+*.tsbuildinfo
+next-env.d.ts
+
+# --- Android & Mobile ---
+# Built application files
+*.apk
+*.ap_
+*.aab
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated files
+bin/
+gen/
+build/
+app/build/
+captures/
+.cxx/
+local.properties
+
+# Keystores & Signing
+*.keystore
+*.jks
+google-services.json
+
+# Android Studio / Gradle
+.gradle/
+.android/
+
+# --- Supabase ---
+.supabase/local-dump.sql
+.supabase/.temp/
+supabase/.branches/
+
+# --- IDEs, Editors & Tooling ---
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# --- Operating System Files ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+
+# --- Logs, Dumps & Temp Files ---
+*.log
+*.log.*
+logs/
+temp/
+tmp/
+*.tmp
+*.bak
+*.swp
