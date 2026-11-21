@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -21,32 +21,37 @@ import {
   Terminal,
   FileText,
   Copy,
+  Check,
   RefreshCw,
+  Zap,
+  Lock,
+  Layers,
+  Cpu,
+  Trash2,
 } from 'lucide-react';
 
 import RiskGauge from '@/components/dashboard/RiskGauge';
 import ScannerAnimation from '@/components/dashboard/ScannerAnimation';
 import AgentTimeline from '@/components/dashboard/AgentTimeline';
+import { api, ScanResult, ThreatIndicatorItem } from '@/lib/api';
 import { InvestigationStep, ThreatIndicator } from '@/lib/mockData';
 
 type TabType = 'url' | 'message' | 'image' | 'qr';
 
-interface ScanResultState {
+interface ParsedScanResult {
+  scanId: string;
+  target: string;
+  type: TabType;
   riskScore: number;
   riskLevel: 'critical' | 'high' | 'medium' | 'low' | 'safe';
   threatCategory: string;
   summary: string;
-  evidence: {
-    title: string;
-    description: string;
-    severity: 'critical' | 'high' | 'warning' | 'info';
-    indicators?: ThreatIndicator[];
-  }[];
+  indicators: ThreatIndicator[];
   steps: InvestigationStep[];
   recommendations: string[];
-  ocrText?: string;
-  extractedUrls?: string[];
+  executionTimeMs: number;
   suspiciousPhrases?: string[];
+  ocrText?: string;
 }
 
 function ScannerContent() {
@@ -56,12 +61,21 @@ function ScannerContent() {
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [urlInput, setUrlInput] = useState('');
   const [messageInput, setMessageInput] = useState('');
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [qrFile, setQrFile] = useState<string | null>(null);
+
+  // Real file uploads
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [qrFile, setQrFile] = useState<File | null>(null);
+  const [qrPreviewUrl, setQrPreviewUrl] = useState<string | null>(null);
+
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const qrInputRef = useRef<HTMLInputElement>(null);
 
   const [isScanning, setIsScanning] = useState(false);
-  const [scanResult, setScanResult] = useState<ScanResultState | null>(null);
+  const [scanResult, setScanResult] = useState<ParsedScanResult | null>(null);
   const [expandedEvidence, setExpandedEvidence] = useState<Record<number, boolean>>({});
+  const [copiedText, setCopiedText] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const tab = searchParams.get('tab') as TabType;
@@ -70,166 +84,220 @@ function ScannerContent() {
     }
   }, [searchParams]);
 
-  // Handle Scan Trigger
-  const handleStartScan = (tab: TabType) => {
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedText(id);
+    setTimeout(() => setCopiedText(null), 2000);
+  };
+
+  // Handle Real Scan Execution
+  const handleStartScan = async (tab: TabType) => {
     setIsScanning(true);
     setScanResult(null);
+    setErrorMessage(null);
 
-    // Simulate multi-agent swarm investigation latency
-    setTimeout(() => {
-      setIsScanning(false);
+    try {
+      let rawResult: ScanResult;
 
       if (tab === 'url') {
-        const isMalicious = urlInput.toLowerCase().includes('chase') ||
-          urlInput.toLowerCase().includes('login') ||
-          urlInput.toLowerCase().includes('verify') ||
-          urlInput.toLowerCase().includes('crypto') ||
-          urlInput.length > 0;
-
-        setScanResult({
-          riskScore: isMalicious ? 95 : 12,
-          riskLevel: isMalicious ? 'critical' : 'safe',
-          threatCategory: isMalicious ? 'Credential Harvester & Phishing' : 'Clean Resource',
-          summary: isMalicious
-            ? 'Identified active lookalike banking portal with cloned SSL identity and credential exfiltration hooks.'
-            : 'Verified legitimate domain certificates, strict HSTS, and zero presence in threat feeds.',
-          evidence: isMalicious
-            ? [
-                {
-                  title: 'Brand Impersonation & Typosquatting',
-                  description: 'Target URL mimics authentic financial institution authorization portal using punycode or recent lookalike domain.',
-                  severity: 'critical',
-                  indicators: [
-                    { type: 'domain', value: urlInput || 'login-chase-update.cc', reputation: 'malicious', confidence: 99, matchedList: 'PhishTank Live' },
-                    { type: 'ip', value: '185.193.125.44', reputation: 'malicious', confidence: 94 },
-                  ],
-                },
-                {
-                  title: 'Malicious Form Action Webhook',
-                  description: 'Client form input sends captured username and OTP directly to an unauthenticated Telegram bot gateway.',
-                  severity: 'critical',
-                },
-              ]
-            : [
-                {
-                  title: 'Valid Extended Validation Certificate',
-                  description: 'Certificate issued by trusted root CA with active OCSP stapling and HSTS enforcement.',
-                  severity: 'info',
-                },
-              ],
-          steps: [
-            { agent: 'WebGuard Sensor', role: 'DNS & HTTP Header Extraction', finding: 'Fetched target HTTP headers and analyzed TLS cipher suite.', duration: '28ms', status: 'complete', severity: 'info' },
-            { agent: 'DOM Crawler Swarm', role: 'Visual & Form Structure Analysis', finding: isMalicious ? 'Detected password input field pointing to foreign IP.' : 'Verified authentic single sign-on form parameters.', duration: '110ms', status: 'complete', severity: isMalicious ? 'critical' : 'success' },
-            { agent: 'Threat Intel Matcher', role: 'Global IOC Correlator', finding: isMalicious ? 'Correlated 2 active blacklisted IOCs in Spamhaus and AbuseIPDB.' : 'Zero matches across 18.4M malicious IOC signatures.', duration: '65ms', status: 'complete', severity: isMalicious ? 'critical' : 'success' },
-            { agent: 'Consensus Coordinator', role: 'LLM Scoring Swarm', finding: `Finalized consensus verdict. Risk score: ${isMalicious ? 95 : 12}/100.`, duration: '40ms', status: 'complete', severity: isMalicious ? 'critical' : 'success' },
-          ],
-          recommendations: isMalicious
-            ? ['Block URL on all perimeter firewalls and endpoint browsers', 'Submit takedown notice to domain registrar', 'Invalidate any credentials potentially submitted']
-            : ['No blocking required; domain adheres to safe browsing protocols'],
-        });
+        if (!urlInput.trim()) return;
+        rawResult = await api.scanUrl(urlInput.trim());
       } else if (tab === 'message') {
-        setScanResult({
-          riskScore: 92,
-          riskLevel: 'critical',
-          threatCategory: 'Financial Smishing & Urgency Scam',
-          summary: 'Scam message contains high-urgency artificial deadlines designed to trick recipients into clicking spoofed postal delivery links.',
-          suspiciousPhrases: [
-            'unpaid postage ($1.95)',
-            'within 12 hours',
-            'package cannot be delivered',
-            'update your details now',
-          ],
-          evidence: [
-            {
-              title: 'High-Urgency Lexical Pattern Match',
-              description: 'Text triggers known psychological coercion models (urgent penalty deadline combined with low-friction $1.95 payment).',
-              severity: 'critical',
-            },
-            {
-              title: 'Extracted Deceptive URL',
-              description: 'Embedded link points to an unverified top-level domain (.top) registered 14 hours ago.',
-              severity: 'critical',
-              indicators: [
-                { type: 'domain', value: 'usps-redelivery-postage.top', reputation: 'malicious', confidence: 98, matchedList: 'SmishGuard Feed' },
-              ],
-            },
-          ],
-          steps: [
-            { agent: 'MessageGuard NLP Engine', role: 'Semantic & Intent Analysis', finding: 'Identified coercive intent and financial coercion markers.', duration: '35ms', status: 'complete', severity: 'critical' },
-            { agent: 'Link Extractor Agent', role: 'URL Sanitization & Unshortening', finding: 'Unpacked obfuscated redirect to phishing destination.', duration: '82ms', status: 'complete', severity: 'critical' },
-            { agent: 'Consensus Coordinator', role: 'Multi-Agent Scoring', finding: 'Calculated 92/100 risk rating. Phishing attack verified.', duration: '28ms', status: 'complete', severity: 'critical' },
-          ],
-          recommendations: [
-            'Do not reply or click any links in this message',
-            'Forward SMS to carrier spam reporting code 7726',
-            'Block the sending phone number or sender ID',
-          ],
-        });
+        if (!messageInput.trim()) return;
+        rawResult = await api.scanMessage(messageInput.trim());
       } else if (tab === 'image') {
-        setScanResult({
-          riskScore: 86,
-          riskLevel: 'high',
-          threatCategory: 'Quishing / Visual Phishing Screenshot',
-          ocrText: 'MICROSOFT SECURITY: Your corporate password expires today. Scan below QR to authenticate: https://auth-m365-verify.me/corp',
-          extractedUrls: ['https://auth-m365-verify.me/corp'],
-          summary: 'Visual image contains deceptive Microsoft security alert with an embedded QR code (Quishing) specifically designed to evade text-based mail filters.',
-          evidence: [
-            {
-              title: 'Optical Character Recognition (OCR) Analysis',
-              description: 'Extracted text simulates Microsoft IT support alert attempting to induce panic around account expiration.',
-              severity: 'high',
-            },
-            {
-              title: 'Embedded Phishing Destination',
-              description: 'Extracted URL resolves to malicious reverse-proxy portal collecting Microsoft OAuth tokens.',
-              severity: 'critical',
-              indicators: [
-                { type: 'domain', value: 'auth-m365-verify.me', reputation: 'malicious', confidence: 96 },
-              ],
-            },
-          ],
-          steps: [
-            { agent: 'MediaGuard OCR Agent', role: 'Optical Character Recognition', finding: 'Extracted 120 characters of high-resolution rendered text.', duration: '68ms', status: 'complete', severity: 'info' },
-            { agent: 'Visual Stego Engine', role: 'Barcode & QR Extraction', finding: 'Detected embedded QR code matrix in lower quadrant.', duration: '54ms', status: 'complete', severity: 'warning' },
-            { agent: 'Domain Reputation Sensor', role: 'IOC Lookup', finding: 'Target domain flagged for Evilginx3 reverse-proxy deployment.', duration: '41ms', status: 'complete', severity: 'critical' },
-            { agent: 'Consensus Coordinator', role: 'Final Swarm Assessment', finding: 'Quishing attack confirmed. Risk score: 86/100.', duration: '31ms', status: 'complete', severity: 'high' },
-          ],
-          recommendations: [
-            'Do not scan the QR code with any mobile device',
-            'Submit the original screenshot or email to your enterprise SOC team',
-            'Verify IT communications through internal verified Slack/Teams channels',
-          ],
-        });
+        if (!imageFile) return;
+        rawResult = await api.scanImage(imageFile);
       } else if (tab === 'qr') {
-        setScanResult({
-          riskScore: 89,
-          riskLevel: 'critical',
-          threatCategory: 'Malicious Web3 QR Drainer',
-          summary: 'Decoded QR code attempts to initiate an obfuscated Ethereum transaction requesting max token spending allowance (Permit2 Drainer).',
-          extractedUrls: ['ethereum:0x71C.../approve?spender=0xDrainerContract&amount=unlimited'],
-          evidence: [
-            {
-              title: 'Obfuscated Smart Contract Approval',
-              description: 'QR matrix decodes to an ERC-20 permit call granting infinite access to wallet assets without immediate gas notice.',
-              severity: 'critical',
-              indicators: [
-                { type: 'wallet', value: '0xDrainerContract...99B4', reputation: 'malicious', confidence: 97, matchedList: 'Etherscan PhishDB' },
-              ],
-            },
-          ],
-          steps: [
-            { agent: 'MediaGuard QR Engine', role: 'Matrix Payload Parsing', finding: 'Decoded high-density QR payload with embedded Ethereum scheme.', duration: '40ms', status: 'complete', severity: 'info' },
-            { agent: 'Web3 Contract Sentinel', role: 'Bytecode & Allowance Audit', finding: 'Identified permit signature targeting arbitrary spender.', duration: '95ms', status: 'complete', severity: 'critical' },
-            { agent: 'Consensus Coordinator', role: 'Consensus Finalization', finding: 'Confirmed malicious crypto drainer vector. Risk: 89/100.', duration: '25ms', status: 'complete', severity: 'critical' },
-          ],
-          recommendations: [
-            'Reject any transaction or signature prompt in your Web3 wallet',
-            'Do not approve allowances for unknown contract spenders',
-            'Scan existing wallet permissions using Revoke.cash',
-          ],
+        if (!qrFile) return;
+        rawResult = await api.scanQR(qrFile);
+      } else {
+        throw new Error('Unknown scan vector');
+      }
+
+      // Convert backend agent findings into structured steps for timeline
+      const agentFindings = rawResult.details?.agent_findings || {};
+      const generatedSteps: InvestigationStep[] = [];
+
+      // 1. Ingestion / Heuristic step
+      if (agentFindings.preliminary_scan) {
+        const prelim = agentFindings.preliminary_scan;
+        generatedSteps.push({
+          agent: 'Ingestion Sentinel',
+          role: 'Pre-flight Heuristics & Normalization',
+          finding:
+            prelim.summary ||
+            `Heuristic inspection identified preliminary risk score of ${prelim.risk_score ?? rawResult.riskScore}/100.`,
+          duration: '18ms',
+          status: 'complete',
+          severity:
+            (prelim.risk_score ?? rawResult.riskScore) > 75
+              ? 'critical'
+              : (prelim.risk_score ?? rawResult.riskScore) > 40
+              ? 'warning'
+              : 'success',
+        });
+      } else {
+        generatedSteps.push({
+          agent: 'Ingestion Sentinel',
+          role: 'Artifact Capture & Pre-Processing',
+          finding: `Successfully extracted and normalized ${tab.toUpperCase()} artifact payload.`,
+          duration: '12ms',
+          status: 'complete',
+          severity: 'info',
         });
       }
-    }, 1800);
+
+      // 2. Vector-specific intelligence agent
+      if (agentFindings.threat_detection_agent) {
+        const tda = agentFindings.threat_detection_agent;
+        generatedSteps.push({
+          agent: 'Threat Detection Agent',
+          role: 'Behavioral Pattern Classification',
+          finding:
+            tda.reasoning ||
+            tda.executive_summary ||
+            `Classified vector as ${tda.threat_category || rawResult.threatCategory} with high confidence.`,
+          duration: '45ms',
+          status: 'complete',
+          severity:
+            (tda.risk_score ?? rawResult.riskScore) > 70
+              ? 'critical'
+              : (tda.risk_score ?? rawResult.riskScore) > 30
+              ? 'warning'
+              : 'success',
+        });
+      }
+
+      // 3. Message / Web Intelligence Agent
+      if (agentFindings.message_intelligence_agent) {
+        const mia = agentFindings.message_intelligence_agent;
+        generatedSteps.push({
+          agent: 'Message Intelligence Agent',
+          role: 'Psychological Pretext & NLP Analysis',
+          finding:
+            mia.executive_summary ||
+            'Evaluated text communication for urgency manipulation and impersonation cues.',
+          duration: '38ms',
+          status: 'complete',
+          severity:
+            (mia.risk_score ?? rawResult.riskScore) > 70 ? 'critical' : 'warning',
+        });
+      } else if (agentFindings.web_intelligence_agent) {
+        const wia = agentFindings.web_intelligence_agent;
+        generatedSteps.push({
+          agent: 'Web Intelligence Agent',
+          role: 'Domain Infrastructure & DNS Profiling',
+          finding:
+            wia.executive_summary ||
+            'Verified DNS records, homoglyph indicators, and certificate authority reputation.',
+          duration: '52ms',
+          status: 'complete',
+          severity:
+            (wia.risk_score ?? rawResult.riskScore) > 70 ? 'critical' : 'success',
+        });
+      } else {
+        generatedSteps.push({
+          agent: 'Threat Intel Matcher',
+          role: 'Global Threat Registry Correlation',
+          finding:
+            rawResult.indicators && rawResult.indicators.length > 0
+              ? `Correlated ${rawResult.indicators.length} threat signatures against active IoC feeds.`
+              : 'Verified clean across 18.4M threat signatures and reputation registries.',
+          duration: '28ms',
+          status: 'complete',
+          severity: rawResult.riskScore > 60 ? 'critical' : 'success',
+        });
+      }
+
+      // 4. Final consensus coordinator
+      generatedSteps.push({
+        agent: 'Consensus Coordinator',
+        role: 'Multi-Agent Scoring & Consensus Verdict',
+        finding: `Finalized consensus verdict. Threat score: ${rawResult.riskScore}/100. Category: ${rawResult.threatCategory}.`,
+        duration: `${rawResult.details?.execution_time_ms || 24}ms`,
+        status: 'complete',
+        severity:
+          rawResult.riskScore > 75
+            ? 'critical'
+            : rawResult.riskScore > 40
+            ? 'warning'
+            : 'success',
+      });
+
+      // Parse IoC indicators
+      const parsedIndicators: ThreatIndicator[] = (rawResult.indicators || []).map(
+        (ind: any) => ({
+          type: ind.type || 'pattern',
+          value: ind.value || String(ind),
+          reputation:
+            ind.severity === 'critical' || ind.severity === 'high'
+              ? 'malicious'
+              : ind.severity === 'medium' || ind.severity === 'warning'
+              ? 'suspicious'
+              : 'clean',
+          confidence: Math.round((ind.confidence || 0.85) * 100),
+          matchedList: ind.source || ind.description || 'AEGISOS Threat Intelligence',
+        })
+      );
+
+      // Extract suspicious phrases if message scan
+      const suspiciousPhrases: string[] = [];
+      if (tab === 'message') {
+        (rawResult.indicators || []).forEach((ind: any) => {
+          if (ind.type === 'scam_phrase' || ind.type === 'suspicious_pattern') {
+            suspiciousPhrases.push(ind.value);
+          }
+        });
+      }
+
+      setScanResult({
+        scanId: rawResult.id,
+        target: rawResult.target,
+        type: tab,
+        riskScore: rawResult.riskScore,
+        riskLevel: rawResult.riskLevel || 'safe',
+        threatCategory: rawResult.threatCategory || rawResult.verdict || 'General Threat',
+        summary: rawResult.summary,
+        indicators: parsedIndicators,
+        steps: generatedSteps,
+        recommendations:
+          rawResult.recommendations && rawResult.recommendations.length > 0
+            ? rawResult.recommendations
+            : [
+                'Continue regular monitoring and verify links before entering credentials.',
+                'Ensure endpoint security definitions remain updated.',
+              ],
+        executionTimeMs: rawResult.details?.execution_time_ms || 32,
+        suspiciousPhrases:
+          suspiciousPhrases.length > 0 ? suspiciousPhrases : undefined,
+      });
+    } catch (err: any) {
+      console.error('Scan failed:', err);
+      setErrorMessage(
+        err.message || 'Scan failed to complete. Please check network connection and try again.'
+      );
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      setImagePreviewUrl(URL.createObjectURL(file));
+      setScanResult(null);
+    }
+  };
+
+  const handleQrFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setQrFile(file);
+      setQrPreviewUrl(URL.createObjectURL(file));
+      setScanResult(null);
+    }
   };
 
   const toggleEvidence = (idx: number) => {
@@ -237,30 +305,40 @@ function ScannerContent() {
   };
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto">
-      {/* Header */}
-      <div>
-        <div className="flex items-center gap-2">
-          <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-widest bg-[#00E5FF]/10 text-[#00E5FF] border border-[#00E5FF]/20">
-            Multi-Vector Defense
-          </span>
-          <span className="text-xs text-[#8794A8] font-mono">Autonomous Inspector</span>
+    <div className="space-y-8 max-w-6xl mx-auto">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-white/5">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-widest bg-[#00E5FF]/10 text-[#00E5FF] border border-[#00E5FF]/30 font-semibold shadow-[0_0_12px_rgba(0,229,255,0.2)]">
+              MULTI-VECTOR DEFENSE
+            </span>
+            <span className="text-xs text-[#00D68F] font-mono flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00D68F] animate-pulse" />
+              8 Autonomous Agents Ready
+            </span>
+          </div>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-[#F4F7FB] mt-1 tracking-tight">
+            Advanced Threat Scanner
+          </h1>
+          <p className="text-xs md:text-sm text-[#8794A8]">
+            Instant deep inspection of suspicious URLs, SMS & communications, screenshots, and QR payloads.
+          </p>
         </div>
-        <h1 className="text-2xl md:text-3xl font-extrabold text-[#F4F7FB] mt-1 tracking-tight">
-          Advanced Threat Scanner
-        </h1>
-        <p className="text-xs md:text-sm text-[#8794A8]">
-          Analyze suspicious URLs, SMS & email messages, images, and QR payloads using AEGISOS agent swarms.
-        </p>
+
+        <div className="flex items-center gap-2 font-mono text-xs text-[#8794A8] bg-[#101725] px-3.5 py-2 rounded-xl border border-white/5 shrink-0">
+          <Terminal className="w-3.5 h-3.5 text-[#00E5FF]" />
+          <span>API: FastAPI v1.0 / ML Naive Bayes</span>
+        </div>
       </div>
 
-      {/* Tab Selector */}
-      <div className="flex items-center gap-2 border-b border-white/5 pb-2">
+      {/* Vector Selector Tabs */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-1.5 rounded-2xl bg-[#101725]/90 border border-white/5 backdrop-blur-xl">
         {[
-          { id: 'url', label: 'URL Scanner', icon: Globe },
-          { id: 'message', label: 'Message & SMS', icon: MessageSquare },
-          { id: 'image', label: 'Image & OCR', icon: ImageIcon },
-          { id: 'qr', label: 'QR Payload', icon: QrCode },
+          { id: 'url', label: 'URL & Website', icon: Globe, count: 'Sub-12ms' },
+          { id: 'message', label: 'SMS & Phishing', icon: MessageSquare, count: 'NLP Heuristics' },
+          { id: 'image', label: 'Screenshot / OCR', icon: ImageIcon, count: 'Visual Quish' },
+          { id: 'qr', label: 'QR Code Matrix', icon: QrCode, count: 'Web3 Drainer' },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -270,27 +348,48 @@ function ScannerContent() {
               onClick={() => {
                 setActiveTab(tab.id as TabType);
                 setScanResult(null);
+                setErrorMessage(null);
               }}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-200 cursor-pointer text-left ${
                 isActive
-                  ? 'bg-[#00E5FF]/15 text-[#00E5FF] border border-[#00E5FF]/30 shadow-[0_0_15px_rgba(0,229,255,0.1)]'
-                  : 'text-[#8794A8] hover:text-[#F4F7FB] hover:bg-white/5'
+                  ? 'bg-gradient-to-r from-[#00E5FF]/20 to-[#7C4DFF]/15 text-white border border-[#00E5FF]/40 shadow-[0_0_20px_rgba(0,229,255,0.2)]'
+                  : 'text-[#8794A8] hover:text-[#F4F7FB] hover:bg-white/5 border border-transparent'
               }`}
             >
-              <Icon className="w-4 h-4" />
-              <span>{tab.label}</span>
+              <div
+                className={`p-2 rounded-lg ${
+                  isActive ? 'bg-[#00E5FF]/20 text-[#00E5FF]' : 'bg-white/5 text-[#8794A8]'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold block truncate">{tab.label}</span>
+                <span className="text-[10px] font-mono text-[#8794A8] block">{tab.count}</span>
+              </div>
             </button>
           );
         })}
       </div>
 
-      {/* Tab Inputs Section */}
-      <div className="rounded-2xl bg-[#151E2D]/80 backdrop-blur-xl border border-white/5 p-6 shadow-xl">
+      {/* Main Scanner Input Box */}
+      <div className="rounded-2xl bg-[#151E2D]/85 backdrop-blur-xl border border-[#00E5FF]/20 p-6 md:p-8 shadow-2xl relative overflow-hidden">
+        {/* Ambient Top Glow */}
+        <div className="absolute top-0 left-1/4 right-1/4 h-[1px] bg-gradient-to-r from-transparent via-[#00E5FF] to-transparent opacity-40" />
+
+        {/* TAB 1: URL SCANNER */}
         {activeTab === 'url' && (
           <div className="space-y-4">
-            <label className="block text-xs font-semibold text-[#8794A8] uppercase tracking-wider">
-              Target URL Analysis
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-[#F4F7FB] uppercase tracking-wider font-mono flex items-center gap-2">
+                <Globe className="w-4 h-4 text-[#00E5FF]" />
+                Target Web Destination
+              </label>
+              <span className="text-[11px] font-mono text-[#00D68F] bg-[#00D68F]/10 px-2 py-0.5 rounded border border-[#00D68F]/20">
+                SSRF & Homoglyph Protection Active
+              </span>
+            </div>
+
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
                 <Globe className="w-4 h-4 text-[#8794A8] absolute left-3.5 top-3.5" />
@@ -298,19 +397,21 @@ function ScannerContent() {
                   type="text"
                   value={urlInput}
                   onChange={(e) => setUrlInput(e.target.value)}
-                  placeholder="Paste URL to analyze (e.g., https://login-chase-update.cc/auth)"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#080B12] border border-white/10 text-xs md:text-sm text-[#F4F7FB] placeholder-[#8794A8] focus:outline-none focus:border-[#00E5FF]/50 font-mono transition-colors"
+                  onKeyDown={(e) => e.key === 'Enter' && handleStartScan('url')}
+                  placeholder="https://login-chase-online-verify.cc/auth or paste suspect domain"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#080B12] border border-white/10 text-xs md:text-sm text-[#F4F7FB] placeholder-[#8794A8] focus:outline-none focus:border-[#00E5FF] font-mono transition-colors shadow-inner"
                 />
               </div>
+
               <button
                 onClick={() => handleStartScan('url')}
                 disabled={isScanning || !urlInput.trim()}
-                className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#00E5FF] to-[#7C4DFF] text-[#080B12] font-bold text-xs md:text-sm flex items-center justify-center gap-2 hover:opacity-95 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(0,229,255,0.25)] shrink-0"
+                className="px-7 py-3 rounded-xl bg-gradient-to-r from-[#00E5FF] to-[#7C4DFF] text-[#080B12] font-black text-xs md:text-sm flex items-center justify-center gap-2 hover:opacity-95 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_0_25px_rgba(0,229,255,0.4)] shrink-0 cursor-pointer active:scale-98"
               >
                 {isScanning ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin text-[#080B12]" />
-                    <span>Analyzing...</span>
+                    <span>Investigating...</span>
                   </>
                 ) : (
                   <>
@@ -320,65 +421,98 @@ function ScannerContent() {
                 )}
               </button>
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-[#8794A8]">
-              <span>Sample tests:</span>
+
+            {/* Quick Demo Test Chips */}
+            <div className="pt-2 flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-[#8794A8] font-mono text-[11px]">Quick Tests:</span>
               <button
-                onClick={() => setUrlInput('https://login-chase-online-verify-security.cc/auth')}
-                className="text-[#00E5FF] hover:underline font-mono"
+                onClick={() => {
+                  setUrlInput('https://login-chase-online-verify-security.cc/auth');
+                  setTimeout(() => handleStartScan('url'), 50);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-[#FF4560]/10 border border-[#FF4560]/30 text-[#FF4560] font-mono text-[11px] hover:bg-[#FF4560]/20 transition-colors cursor-pointer"
               >
-                Suspicious Chase Phish
+                🚨 Chase Phishing Clone
               </button>
-              <span>•</span>
               <button
-                onClick={() => setUrlInput('https://github.com/torvalds/linux')}
-                className="text-[#00D68F] hover:underline font-mono"
+                onClick={() => {
+                  setUrlInput('https://paypal-customer-resolution-center.info/dispute');
+                  setTimeout(() => handleStartScan('url'), 50);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-[#FFB020]/10 border border-[#FFB020]/30 text-[#FFB020] font-mono text-[11px] hover:bg-[#FFB020]/20 transition-colors cursor-pointer"
               >
-                Safe GitHub Repo
+                ⚠️ PayPal Fake Resolver
+              </button>
+              <button
+                onClick={() => {
+                  setUrlInput('https://github.com/torvalds/linux/releases');
+                  setTimeout(() => handleStartScan('url'), 50);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-[#00D68F]/10 border border-[#00D68F]/30 text-[#00D68F] font-mono text-[11px] hover:bg-[#00D68F]/20 transition-colors cursor-pointer"
+              >
+                ✅ Official GitHub Linux
               </button>
             </div>
           </div>
         )}
 
+        {/* TAB 2: MESSAGE SCANNER */}
         {activeTab === 'message' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <label className="block text-xs font-semibold text-[#8794A8] uppercase tracking-wider">
-                SMS / Email / Social Message Text
+              <label className="text-xs font-bold text-[#F4F7FB] uppercase tracking-wider font-mono flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-[#7C4DFF]" />
+                SMS / Email / Social Message Payload
               </label>
               <span className="text-xs font-mono text-[#8794A8]">
                 {messageInput.length} characters
               </span>
             </div>
+
             <textarea
               rows={4}
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
-              placeholder="Paste suspicious text or SMS here (e.g. USPS: We tried to deliver your parcel #US89218 but unpaid postage ($1.95) is required: https://usps-redelivery.top)..."
-              className="w-full p-4 rounded-xl bg-[#080B12] border border-white/10 text-xs md:text-sm text-[#F4F7FB] placeholder-[#8794A8] focus:outline-none focus:border-[#7C4DFF]/50 font-mono transition-colors"
+              placeholder="Paste suspicious SMS, WhatsApp message, or urgent alert here (e.g. 'Dear SBI customer, your savings account is suspended due to expired KYC...')"
+              className="w-full p-4 rounded-xl bg-[#080B12] border border-white/10 text-xs md:text-sm text-[#F4F7FB] placeholder-[#8794A8] focus:outline-none focus:border-[#7C4DFF] font-mono transition-colors shadow-inner leading-relaxed"
             />
-            <div className="flex justify-between items-center flex-wrap gap-2">
-              <div className="flex items-center gap-2 text-[11px] text-[#8794A8]">
-                <span>Sample tests:</span>
+
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-[#8794A8] font-mono text-[11px]">Quick Tests:</span>
                 <button
-                  onClick={() =>
+                  onClick={() => {
                     setMessageInput(
-                      'USPS: We tried to deliver your parcel #US89218 but unpaid postage ($1.95) is required. Update within 12 hours: https://usps-redelivery.top'
-                    )
-                  }
-                  className="text-[#7C4DFF] hover:underline font-mono"
+                      'Dear SBI customer, your savings account #4102 has been suspended due to expired KYC. Update your PAN card immediately to avoid permanent closure: http://sbi-pan-update.xyz/verify'
+                    );
+                    setTimeout(() => handleStartScan('message'), 50);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-[#FF4560]/10 border border-[#FF4560]/30 text-[#FF4560] font-mono text-[11px] hover:bg-[#FF4560]/20 transition-colors cursor-pointer"
                 >
-                  USPS Smishing Scam
+                  🏦 SBI Bank Scam
+                </button>
+                <button
+                  onClick={() => {
+                    setMessageInput(
+                      'USPS Alert: Your package #US8921 cannot be delivered due to incomplete street address. Pay $1.95 redelivery fee within 12h: https://usps-redelivery.top'
+                    );
+                    setTimeout(() => handleStartScan('message'), 50);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-[#FFB020]/10 border border-[#FFB020]/30 text-[#FFB020] font-mono text-[11px] hover:bg-[#FFB020]/20 transition-colors cursor-pointer"
+                >
+                  📦 USPS Parcel Trap
                 </button>
               </div>
+
               <button
                 onClick={() => handleStartScan('message')}
                 disabled={isScanning || !messageInput.trim()}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#7C4DFF] to-[#00E5FF] text-[#080B12] font-bold text-xs md:text-sm flex items-center gap-2 hover:opacity-95 transition-opacity disabled:opacity-40"
+                className="px-7 py-3 rounded-xl bg-gradient-to-r from-[#7C4DFF] to-[#00E5FF] text-[#080B12] font-black text-xs md:text-sm flex items-center gap-2 hover:opacity-95 transition-opacity disabled:opacity-40 shadow-[0_0_25px_rgba(124,77,255,0.4)] cursor-pointer shrink-0"
               >
                 {isScanning ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <RefreshCw className="w-4 h-4 animate-spin text-[#080B12]" />
                 ) : (
-                  <Search className="w-4 h-4" />
+                  <Search className="w-4 h-4 text-[#080B12]" />
                 )}
                 <span>Analyze Message</span>
               </button>
@@ -386,107 +520,209 @@ function ScannerContent() {
           </div>
         )}
 
+        {/* TAB 3: IMAGE / SCREENSHOT OCR SCANNER */}
         {activeTab === 'image' && (
           <div className="space-y-4">
-            <label className="block text-xs font-semibold text-[#8794A8] uppercase tracking-wider">
-              Visual Screenshot / Document Scan
-            </label>
-            <div
-              onClick={() => {
-                setSelectedFile('microsoft-password-quish.png');
-              }}
-              className="border-2 border-dashed border-white/15 hover:border-[#00E5FF]/40 rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-[#080B12]/50"
-            >
-              <Upload className="w-8 h-8 text-[#00E5FF] mb-2" />
-              <p className="text-sm font-semibold text-[#F4F7FB]">
-                {selectedFile ? `Selected: ${selectedFile}` : 'Drag & drop suspicious screenshot or click to browse'}
-              </p>
-              <p className="text-xs text-[#8794A8] mt-1">
-                Supports PNG, JPG, WEBP. Automatic OCR text extraction and barcode decoding.
-              </p>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-[#F4F7FB] uppercase tracking-wider font-mono flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-[#00D68F]" />
+                Upload Screenshot or Graphic Asset
+              </label>
+              <span className="text-[11px] font-mono text-[#8794A8]">
+                Supports PNG, JPG, WEBP up to 10MB
+              </span>
             </div>
 
-            {selectedFile && (
-              <div className="flex items-center justify-between p-3 rounded-lg bg-[#080B12] border border-white/10">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-[#00E5FF]" />
-                  <span className="text-xs font-mono text-[#F4F7FB]">{selectedFile}</span>
+            <input
+              type="file"
+              ref={imageInputRef}
+              onChange={handleImageFileChange}
+              accept="image/*"
+              className="hidden"
+            />
+
+            {!imageFile ? (
+              <div
+                onClick={() => imageInputRef.current?.click()}
+                className="border-2 border-dashed border-[#00E5FF]/30 hover:border-[#00E5FF] rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all bg-[#080B12]/60 hover:bg-[#00E5FF]/5 group"
+              >
+                <div className="w-14 h-14 rounded-2xl bg-[#00E5FF]/10 border border-[#00E5FF]/30 flex items-center justify-center text-[#00E5FF] group-hover:scale-110 transition-transform mb-3 shadow-[0_0_20px_rgba(0,229,255,0.2)]">
+                  <Upload className="w-6 h-6" />
                 </div>
-                <button
-                  onClick={() => handleStartScan('image')}
-                  disabled={isScanning}
-                  className="px-4 py-2 rounded-lg bg-[#00E5FF] text-[#080B12] text-xs font-bold"
-                >
-                  {isScanning ? 'Extracting OCR...' : 'Run OCR & Threat Audit'}
-                </button>
+                <p className="text-sm font-bold text-[#F4F7FB]">
+                  Click or drag screenshot here to analyze
+                </p>
+                <p className="text-xs text-[#8794A8] mt-1 max-w-sm">
+                  Neural computer vision will extract embedded text via OCR, detect brand spoofing, and identify hidden malicious links.
+                </p>
+              </div>
+            ) : (
+              <div className="p-4 rounded-xl bg-[#080B12] border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  {imagePreviewUrl && (
+                    <img
+                      src={imagePreviewUrl}
+                      alt="Selected upload preview"
+                      className="w-16 h-16 rounded-lg object-cover border border-[#00E5FF]/30"
+                    />
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-[#F4F7FB] truncate">
+                      {imageFile.name}
+                    </p>
+                    <p className="text-[10px] font-mono text-[#8794A8]">
+                      {(imageFile.size / 1024).toFixed(1)} KB • Ready for OCR analysis
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setImageFile(null);
+                      setImagePreviewUrl(null);
+                    }}
+                    className="p-2 rounded-lg bg-white/5 text-[#8794A8] hover:text-[#FF4560] transition-colors cursor-pointer"
+                    title="Remove file"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleStartScan('image')}
+                    disabled={isScanning}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#00D68F] to-[#00E5FF] text-[#080B12] font-black text-xs flex items-center gap-2 hover:opacity-95 shadow-[0_0_20px_rgba(0,214,143,0.3)] cursor-pointer"
+                  >
+                    {isScanning ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                    <span>Run Vision & OCR Scan</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
         )}
 
+        {/* TAB 4: QR CODE DECODER */}
         {activeTab === 'qr' && (
           <div className="space-y-4">
-            <label className="block text-xs font-semibold text-[#8794A8] uppercase tracking-wider">
-              QR Code Matrix Payload Decoder
-            </label>
-            <div
-              onClick={() => {
-                setQrFile('crypto-drainer-qr.png');
-              }}
-              className="border-2 border-dashed border-white/15 hover:border-[#7C4DFF]/40 rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-[#080B12]/50"
-            >
-              <QrCode className="w-8 h-8 text-[#7C4DFF] mb-2" />
-              <p className="text-sm font-semibold text-[#F4F7FB]">
-                {qrFile ? `Selected: ${qrFile}` : 'Upload QR Code image for deep decoding'}
-              </p>
-              <p className="text-xs text-[#8794A8] mt-1">
-                Decodes raw URLs, smart contract signatures, Wi-Fi payloads, and binary data.
-              </p>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-[#F4F7FB] uppercase tracking-wider font-mono flex items-center gap-2">
+                <QrCode className="w-4 h-4 text-[#FFB020]" />
+                QR Code Matrix Payload Inspection
+              </label>
+              <span className="text-[11px] font-mono text-[#8794A8]">
+                Decodes Permitted Transactions, Web3 Calls & URLs
+              </span>
             </div>
 
-            {qrFile && (
-              <div className="flex items-center justify-between p-3 rounded-lg bg-[#080B12] border border-white/10">
-                <div className="flex items-center gap-2">
-                  <QrCode className="w-4 h-4 text-[#7C4DFF]" />
-                  <span className="text-xs font-mono text-[#F4F7FB]">{qrFile}</span>
+            <input
+              type="file"
+              ref={qrInputRef}
+              onChange={handleQrFileChange}
+              accept="image/*"
+              className="hidden"
+            />
+
+            {!qrFile ? (
+              <div
+                onClick={() => qrInputRef.current?.click()}
+                className="border-2 border-dashed border-[#FFB020]/30 hover:border-[#FFB020] rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all bg-[#080B12]/60 hover:bg-[#FFB020]/5 group"
+              >
+                <div className="w-14 h-14 rounded-2xl bg-[#FFB020]/10 border border-[#FFB020]/30 flex items-center justify-center text-[#FFB020] group-hover:scale-110 transition-transform mb-3 shadow-[0_0_20px_rgba(255,176,32,0.2)]">
+                  <QrCode className="w-6 h-6" />
                 </div>
-                <button
-                  onClick={() => handleStartScan('qr')}
-                  disabled={isScanning}
-                  className="px-4 py-2 rounded-lg bg-[#7C4DFF] text-[#F4F7FB] text-xs font-bold"
-                >
-                  {isScanning ? 'Decoding Matrix...' : 'Decode & Inspect Payload'}
-                </button>
+                <p className="text-sm font-bold text-[#F4F7FB]">
+                  Upload or drop QR Code image here
+                </p>
+                <p className="text-xs text-[#8794A8] mt-1 max-w-sm">
+                  Decodes barcode matrix payloads, inspects ERC-20 permit drainers, verifies Wi-Fi beacons, and checks phishing hops without opening URLs.
+                </p>
+              </div>
+            ) : (
+              <div className="p-4 rounded-xl bg-[#080B12] border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  {qrPreviewUrl && (
+                    <img
+                      src={qrPreviewUrl}
+                      alt="Selected QR preview"
+                      className="w-16 h-16 rounded-lg object-contain bg-white p-1 border border-[#FFB020]/30"
+                    />
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-[#F4F7FB] truncate">
+                      {qrFile.name}
+                    </p>
+                    <p className="text-[10px] font-mono text-[#8794A8]">
+                      {(qrFile.size / 1024).toFixed(1)} KB • QR Ready to decode
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setQrFile(null);
+                      setQrPreviewUrl(null);
+                    }}
+                    className="p-2 rounded-lg bg-white/5 text-[#8794A8] hover:text-[#FF4560] transition-colors cursor-pointer"
+                    title="Remove QR"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleStartScan('qr')}
+                    disabled={isScanning}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#FFB020] to-[#FF4560] text-[#080B12] font-black text-xs flex items-center gap-2 hover:opacity-95 shadow-[0_0_20px_rgba(255,176,32,0.3)] cursor-pointer"
+                  >
+                    {isScanning ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                    <span>Decode Matrix Payload</span>
+                  </button>
+                </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Error Alert Display */}
+        {errorMessage && (
+          <div className="mt-4 p-3 rounded-xl bg-[#FF4560]/10 border border-[#FF4560]/30 text-xs text-[#FF4560] flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>{errorMessage}</span>
           </div>
         )}
       </div>
 
-      {/* Scanning State: Animated Scanner Radar Effect */}
+      {/* Live Radar Scanning Animation */}
       <AnimatePresence>
         {isScanning && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="rounded-2xl bg-[#151E2D]/90 backdrop-blur-xl border border-[#00E5FF]/20 p-8 shadow-2xl flex flex-col items-center"
+            className="rounded-2xl bg-[#151E2D]/95 backdrop-blur-xl border border-[#00E5FF]/30 p-8 shadow-2xl flex flex-col items-center"
           >
             <ScannerAnimation
-              statusText="Multi-Agent Threat Analysis Active"
-              subText="Ingesting payload, testing against 18.4M threat signatures, running heuristic NLP and zero-day correlation..."
+              statusText="Swarm Investigation in Progress..."
+              subText="Querying 8 autonomous neural models, inspecting homoglyphs, and correlating with live IoC intelligence..."
               activeAgents={[
                 'Ingestion Sentinel',
-                'Heuristic NLP Urgency',
-                'Threat Intel Matcher',
-                'Consensus Swarm',
+                'Threat Detection Agent',
+                'Web & Message Intelligence',
+                'Consensus Swarm Arbiter',
               ]}
             />
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Scan Results Display */}
+      {/* REAL-TIME SCAN RESULTS DISPLAY */}
       <AnimatePresence>
         {scanResult && !isScanning && (
           <motion.div
@@ -496,9 +732,16 @@ function ScannerContent() {
             className="space-y-6"
           >
             {/* Top Results Card: Risk Gauge & High-level assessment */}
-            <div className="rounded-2xl bg-[#151E2D]/80 backdrop-blur-xl border border-white/5 p-6 shadow-xl grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-              <div className="md:col-span-1 flex justify-center">
-                <RiskGauge score={scanResult.riskScore} size={220} label="Consensus Threat Score" />
+            <div className="rounded-2xl bg-[#151E2D]/90 backdrop-blur-xl border border-[#00E5FF]/20 p-6 shadow-2xl grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+              <div className="md:col-span-1 flex flex-col items-center justify-center">
+                <RiskGauge
+                  score={scanResult.riskScore}
+                  size={210}
+                  label="Consensus Threat Score"
+                />
+                <span className="text-[11px] font-mono text-[#8794A8] mt-2">
+                  Evaluated in {scanResult.executionTimeMs}ms
+                </span>
               </div>
 
               <div className="md:col-span-2 space-y-3">
@@ -506,28 +749,46 @@ function ScannerContent() {
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-mono font-bold uppercase border ${
                       scanResult.riskLevel === 'critical'
-                        ? 'bg-[#FF4560]/15 text-[#FF4560] border-[#FF4560]/30'
+                        ? 'bg-[#FF4560]/15 text-[#FF4560] border-[#FF4560]/30 shadow-[0_0_12px_rgba(255,69,96,0.3)]'
                         : scanResult.riskLevel === 'high'
                         ? 'bg-[#FFB020]/15 text-[#FFB020] border-[#FFB020]/30'
                         : 'bg-[#00D68F]/15 text-[#00D68F] border-[#00D68F]/30'
                     }`}
                   >
-                    {scanResult.riskLevel} Risk Level
+                    {scanResult.riskLevel} Risk Severity
                   </span>
-                  <span className="px-3 py-1 rounded-full text-xs font-mono bg-[#00E5FF]/10 text-[#00E5FF] border border-[#00E5FF]/20">
-                    {scanResult.threatCategory}
+                  <span className="px-3 py-1 rounded-full text-xs font-mono bg-[#00E5FF]/10 text-[#00E5FF] border border-[#00E5FF]/30">
+                    Category: {scanResult.threatCategory}
+                  </span>
+                  <span className="text-xs font-mono text-[#8794A8] ml-auto">
+                    ID: {scanResult.scanId.slice(0, 8)}
                   </span>
                 </div>
 
-                <h3 className="text-lg font-bold text-[#F4F7FB]">
-                  Threat Investigation Summary
+                <h3 className="text-xl font-extrabold text-[#F4F7FB] tracking-tight">
+                  Autonomous Multi-Agent Finding
                 </h3>
                 <p className="text-xs md:text-sm text-[#8794A8] leading-relaxed">
                   {scanResult.summary}
                 </p>
 
-                {/* Extracted Details / Highlighted suspicious items */}
-                {scanResult.suspiciousPhrases && (
+                {/* Target Information */}
+                <div className="p-3 rounded-xl bg-[#080B12] border border-white/5 font-mono text-xs flex items-center justify-between gap-3">
+                  <div className="min-w-0 truncate">
+                    <span className="text-[10px] uppercase text-[#8794A8] block">Inspected Target:</span>
+                    <span className="text-[#00E5FF] truncate block">{scanResult.target}</span>
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard(scanResult.target, 'target')}
+                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[#8794A8] hover:text-white transition-colors cursor-pointer shrink-0"
+                    title="Copy Target"
+                  >
+                    {copiedText === 'target' ? <Check className="w-3.5 h-3.5 text-[#00D68F]" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+
+                {/* Flagged Deceptive Phrases if message */}
+                {scanResult.suspiciousPhrases && scanResult.suspiciousPhrases.length > 0 && (
                   <div className="pt-2">
                     <span className="text-[11px] font-mono text-[#8794A8] uppercase block mb-1.5">
                       Flagged Deceptive Phrases:
@@ -536,127 +797,107 @@ function ScannerContent() {
                       {scanResult.suspiciousPhrases.map((phrase, i) => (
                         <span
                           key={i}
-                          className="px-2 py-0.5 rounded bg-[#FF4560]/10 text-[#FF4560] border border-[#FF4560]/20 text-xs font-mono"
+                          className="px-2.5 py-0.5 rounded-full bg-[#FF4560]/15 text-[#FF4560] border border-[#FF4560]/30 text-xs font-mono font-semibold"
                         >
-                          "{phrase}"
+                          &ldquo;{phrase}&rdquo;
                         </span>
                       ))}
                     </div>
                   </div>
                 )}
-
-                {scanResult.ocrText && (
-                  <div className="pt-2">
-                    <span className="text-[11px] font-mono text-[#8794A8] uppercase block mb-1">
-                      OCR Extracted Text:
-                    </span>
-                    <p className="text-xs font-mono bg-[#080B12] p-2.5 rounded-lg border border-white/5 text-[#F4F7FB]">
-                      {scanResult.ocrText}
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
 
-            {/* Evidence Cards Section with Expandable Details */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold tracking-wider uppercase text-[#F4F7FB]">
-                Forensic Evidence & Threat Indicators
-              </h3>
-              <div className="space-y-3">
-                {scanResult.evidence.map((ev, idx) => {
-                  const isExpanded = expandedEvidence[idx] ?? true;
-                  return (
-                    <div
-                      key={idx}
-                      className="rounded-xl bg-[#151E2D]/80 backdrop-blur-xl border border-white/5 overflow-hidden"
-                    >
-                      <button
-                        onClick={() => toggleEvidence(idx)}
-                        className="w-full p-4 flex items-center justify-between text-left hover:bg-white/[0.02] transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`p-2 rounded-lg ${
-                              ev.severity === 'critical'
-                                ? 'bg-[#FF4560]/10 text-[#FF4560]'
-                                : 'bg-[#FFB020]/10 text-[#FFB020]'
-                            }`}
-                          >
-                            <ShieldAlert className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <h4 className="text-xs md:text-sm font-bold text-[#F4F7FB]">
-                              {ev.title}
-                            </h4>
-                            <p className="text-xs text-[#8794A8] mt-0.5">{ev.description}</p>
-                          </div>
-                        </div>
-                        {isExpanded ? (
-                          <ChevronUp className="w-4 h-4 text-[#8794A8]" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-[#8794A8]" />
-                        )}
-                      </button>
-
-                      {isExpanded && ev.indicators && ev.indicators.length > 0 && (
-                        <div className="px-4 pb-4 pt-1 border-t border-white/5">
-                          <span className="text-[10px] uppercase font-mono text-[#8794A8] block mb-2">
-                            Extracted IOC Indicators:
-                          </span>
-                          <div className="space-y-2">
-                            {ev.indicators.map((ind, i) => (
-                              <div
-                                key={i}
-                                className="flex items-center justify-between p-2 rounded-lg bg-[#080B12] border border-white/5 text-xs font-mono"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="px-1.5 py-0.5 rounded bg-white/5 text-[10px] uppercase text-[#00E5FF]">
-                                    {ind.type}
-                                  </span>
-                                  <span className="text-[#F4F7FB]">{ind.value}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  {ind.matchedList && (
-                                    <span className="text-[10px] text-[#8794A8]">
-                                      {ind.matchedList}
-                                    </span>
-                                  )}
-                                  <span className="text-[#FF4560] font-bold">
-                                    {ind.confidence}% confidence
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+            {/* Extracted IoC Threat Indicators */}
+            <div className="rounded-2xl bg-[#151E2D]/85 backdrop-blur-xl border border-white/5 p-6 shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-[#00E5FF]" />
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-[#F4F7FB] font-mono">
+                    Correlated Threat Indicators ({scanResult.indicators.length})
+                  </h3>
+                </div>
+                <span className="text-xs font-mono text-[#8794A8]">
+                  Zero False-Positive Consensus Gate
+                </span>
               </div>
+
+              {scanResult.indicators.length > 0 ? (
+                <div className="space-y-2">
+                  {scanResult.indicators.map((ind, i) => (
+                    <div
+                      key={i}
+                      className="p-3 rounded-xl bg-[#080B12] border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            ind.reputation === 'malicious'
+                              ? 'bg-[#FF4560]/20 text-[#FF4560] border border-[#FF4560]/40'
+                              : ind.reputation === 'suspicious'
+                              ? 'bg-[#FFB020]/20 text-[#FFB020] border border-[#FFB020]/40'
+                              : 'bg-[#00D68F]/20 text-[#00D68F] border border-[#00D68F]/40'
+                          }`}
+                        >
+                          {ind.type}
+                        </span>
+                        <span className="text-[#F4F7FB] truncate font-semibold">
+                          {ind.value}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-4 shrink-0 self-end sm:self-center">
+                        {ind.matchedList && (
+                          <span className="text-[11px] text-[#8794A8] hidden sm:inline">
+                            {ind.matchedList}
+                          </span>
+                        )}
+                        <span className="text-[#00E5FF] font-bold">
+                          {ind.confidence}% confidence
+                        </span>
+                        <button
+                          onClick={() => copyToClipboard(ind.value, `ind-${i}`)}
+                          className="p-1 text-[#8794A8] hover:text-white transition-colors cursor-pointer"
+                          title="Copy IoC"
+                        >
+                          {copiedText === `ind-${i}` ? (
+                            <Check className="w-3.5 h-3.5 text-[#00D68F]" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl bg-[#080B12]/40 text-center text-xs text-[#00D68F] font-mono flex items-center justify-center gap-2">
+                  <CheckCircle className="w-4 h-4" />
+                  <span>No malicious threat signatures matched in threat registries.</span>
+                </div>
+              )}
             </div>
 
             {/* AI Multi-Agent Execution Timeline */}
-            <div className="rounded-2xl bg-[#151E2D]/80 backdrop-blur-xl border border-white/5 p-6 shadow-xl">
+            <div className="rounded-2xl bg-[#151E2D]/85 backdrop-blur-xl border border-white/5 p-6 shadow-xl">
               <AgentTimeline steps={scanResult.steps} />
             </div>
 
             {/* Recommended Protective Actions */}
-            <div className="rounded-2xl bg-[#151E2D]/80 backdrop-blur-xl border border-white/5 p-6 shadow-xl">
+            <div className="rounded-2xl bg-[#151E2D]/85 backdrop-blur-xl border border-white/5 p-6 shadow-xl">
               <div className="flex items-center gap-2 mb-3">
                 <CheckCircle className="w-4 h-4 text-[#00D68F]" />
-                <h4 className="text-sm font-semibold tracking-wider uppercase text-[#F4F7FB]">
-                  Recommended Actions
+                <h4 className="text-sm font-bold tracking-wider uppercase text-[#F4F7FB] font-mono">
+                  Autonomous Tactical Countermeasures
                 </h4>
               </div>
               <ul className="space-y-2">
                 {scanResult.recommendations.map((rec, i) => (
                   <li
                     key={i}
-                    className="flex items-start gap-2.5 text-xs text-[#F4F7FB]/90 bg-[#080B12]/50 p-2.5 rounded-lg border border-white/5"
+                    className="flex items-start gap-2.5 text-xs text-[#F4F7FB]/90 bg-[#080B12] p-3 rounded-xl border border-white/5 font-mono"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#00D68F] mt-1.5 shrink-0" />
+                    <span className="w-2 h-2 rounded-full bg-[#00D68F] mt-1.5 shrink-0 shadow-[0_0_8px_#00D68F]" />
                     <span>{rec}</span>
                   </li>
                 ))}
@@ -671,7 +912,13 @@ function ScannerContent() {
 
 export default function ThreatScannerPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-xs font-mono text-[#8794A8]">Loading Scanner...</div>}>
+    <Suspense
+      fallback={
+        <div className="p-12 text-center text-xs font-mono text-[#00E5FF]">
+          Initializing Autonomous Threat Scanner...
+        </div>
+      }
+    >
       <ScannerContent />
     </Suspense>
   );

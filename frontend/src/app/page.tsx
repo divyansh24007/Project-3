@@ -32,6 +32,7 @@ import { Badge } from "@/components/ui/Badge";
 
 export default function LandingPage() {
   const [activeTab, setActiveTab] = useState<"architecture" | "agents">("architecture");
+  const [heroUrl, setHeroUrl] = useState("");
 
   // Feature cards data
   const features = [
@@ -237,30 +238,60 @@ export default function LandingPage() {
 
             {/* Subheading */}
             <p className="text-lg sm:text-xl text-[#8794A8] max-w-2xl mx-auto lg:mx-0 font-normal leading-relaxed">
-              AI-powered protection that detects, investigates and helps prevent digital
-              threats before they compromise your security.
+              Autonomous multi-agent protection that inspects URLs, scam messages,
+              screenshots, and QR codes before they compromise your identity.
             </p>
 
+            {/* Live Hero Scanner Bar */}
+            <div className="pt-2 max-w-xl mx-auto lg:mx-0">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (heroUrl.trim()) {
+                    window.location.href = `/dashboard/scanner?tab=url&input=${encodeURIComponent(heroUrl.trim())}`;
+                  }
+                }}
+                className="flex flex-col sm:flex-row items-stretch gap-2.5 p-2 rounded-2xl bg-[#151E2D]/90 border border-[#00E5FF]/30 shadow-[0_0_30px_rgba(0,229,255,0.15)] backdrop-blur-xl"
+              >
+                <div className="relative flex-1">
+                  <Globe className="w-4 h-4 text-[#00E5FF] absolute left-3.5 top-3.5" />
+                  <input
+                    type="text"
+                    value={heroUrl}
+                    onChange={(e) => setHeroUrl(e.target.value)}
+                    placeholder="Test any URL (e.g. login-chase-update.cc)..."
+                    className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-[#080B12] border border-white/10 text-xs sm:text-sm text-[#F4F7FB] placeholder-[#8794A8] font-mono focus:outline-none focus:border-[#00E5FF]"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#00E5FF] to-[#7C4DFF] text-[#080B12] font-black text-xs sm:text-sm hover:opacity-95 transition-opacity shadow-[0_0_15px_rgba(0,229,255,0.4)] shrink-0 cursor-pointer active:scale-98"
+                >
+                  Inspect Target
+                </button>
+              </form>
+            </div>
+
             {/* CTAs */}
-            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-4">
-              <Link href="/auth/signup" className="w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3.5 pt-2">
+              <Link href="/dashboard/scanner" className="w-full sm:w-auto">
                 <Button
                   variant="primary"
                   size="lg"
-                  className="w-full sm:w-auto text-base px-8 py-6 shadow-[0_0_30px_rgba(0,229,255,0.4)]"
-                  rightIcon={<ArrowRight className="w-5 h-5" />}
+                  className="w-full sm:w-auto text-sm px-8 shadow-[0_0_25px_rgba(0,229,255,0.4)]"
+                  rightIcon={<ArrowRight className="w-4 h-4" />}
                 >
-                  Get Started Free
+                  Launch Threat Scanner
                 </Button>
               </Link>
               <Link href="/dashboard" className="w-full sm:w-auto">
                 <Button
                   variant="outline"
                   size="lg"
-                  className="w-full sm:w-auto text-base px-8 py-6 border-[#00E5FF]/30 hover:border-[#00E5FF]"
-                  leftIcon={<Activity className="w-5 h-5" />}
+                  className="w-full sm:w-auto text-sm px-7 border-[#00E5FF]/40 hover:border-[#00E5FF]"
+                  leftIcon={<Activity className="w-4 h-4" />}
                 >
-                  View Live Dashboard
+                  Live SOC Dashboard
                 </Button>
               </Link>
             </div>
