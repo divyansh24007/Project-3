@@ -153,7 +153,21 @@ class FallbackProvider(AIProvider):
         system_prompt: Optional[str] = None,
     ) -> str:
         ctx = context or {}
-        risk_score = float(ctx.get("risk_score", 0.0))
+        risk_score = float(ctx.get("risk_score", ctx.get("final_risk_score", 0.0)))
+        
+        # Check nested contexts if risk_score is 0
+        if risk_score == 0.0:
+            if "agent_findings" in ctx and isinstance(ctx["agent_findings"], list):
+                for item in ctx["agent_findings"]:
+                    if isinstance(item, dict):
+                        s = float(item.get("risk_score", item.get("final_risk_score", 0.0)))
+                        if s > risk_score:
+                            risk_score = s
+            elif "message_heuristics" in ctx and isinstance(ctx["message_heuristics"], dict):
+                risk_score = float(ctx["message_heuristics"].get("risk_score", 0.0))
+            elif "image_result" in ctx and isinstance(ctx["image_result"], dict):
+                risk_score = float(ctx["image_result"].get("risk_score", 0.0))
+
         input_type = ctx.get("input_type", "unknown")
         patterns = ctx.get("patterns", {})
         indicators = ctx.get("indicators", [])
@@ -183,8 +197,12 @@ class FallbackProvider(AIProvider):
         synthesized = {
             "engine": "AEGISOS-Deterministic-Intelligence-Engine",
             "risk_score": risk_score,
+            "final_risk_score": risk_score,
             "risk_level": risk_level,
+            "final_risk_level": risk_level,
             "threat_category": threat_cat,
+            "primary_threat": threat_cat,
+            "executive_summary": reasoning,
             "recommended_action": action,
             "reasoning": reasoning,
             "key_indicators_found": len(indicators),

@@ -342,10 +342,10 @@ class AgentOrchestrator:
             }
 
         # Step 2: Final synthesis
-        risk_score = float(risk_eval.get("final_risk_score", 0.0))
-        risk_level = str(risk_eval.get("final_risk_level", "safe"))
-        threat_cat = str(risk_eval.get("threat_category", "unknown"))
-        summary = str(risk_eval.get("executive_summary", "Analysis completed."))
+        risk_score = float(risk_eval.get("final_risk_score", risk_eval.get("risk_score", 0.0)))
+        risk_level = str(risk_eval.get("final_risk_level", risk_eval.get("risk_level", "safe")))
+        threat_cat = str(risk_eval.get("threat_category", risk_eval.get("primary_threat", "unknown")))
+        summary = str(risk_eval.get("executive_summary", risk_eval.get("threat_summary", "Analysis completed.")))
         recommendations = self.generate_recommendations(risk_level, threat_cat, agent_findings)
 
         execution_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
