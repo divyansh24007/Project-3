@@ -14,9 +14,6 @@
   
   --font-inter: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
-}
-
-@theme {
   --color-bg-primary: #080B12;
   --color-bg-secondary: #101725;
   --color-bg-card: #151E2D;
@@ -27,7 +24,6 @@
   --color-critical: #FF4560;
   --color-text-main: #F4F7FB;
   --color-text-muted: #8794A8;
-
   --color-cyber-cyan: #00E5FF;
   --color-cyber-purple: #7C4DFF;
   --color-cyber-dark: #080B12;

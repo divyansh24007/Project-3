@@ -13,13 +13,14 @@
 
 | Subsystem | Overall Status | Readiness for Hackathon / Demo |
 | :--- | :---: | :---: |
-| **FastAPI Backend Core** | `[Completed]` | 100% functional with Swagger UI at `/docs` |
-| **ML & Heuristic Scanners** | `[Completed]` | Built-in TF-IDF + Naive Bayes, SSRF guard, regex engines |
-| **8-Agent AI Swarm** | `[Completed]` | Orchestrator pipeline with Gemini/Groq & fallback heuristics |
-| **Supabase PostgreSQL Schema & RLS** | `[Completed]` | Migrations 001 & 002 with 10 tables, triggers, and RLS |
+| **FastAPI Backend Core** | `[Completed]` | 100% functional with Swagger UI at `/docs` (24/24 tests passing) |
+| **ML & Heuristic Scanners** | `[Completed]` | Built-in TF-IDF + Naive Bayes, SSRF guard, regex engines, retrained cached model |
+| **8-Agent AI Swarm** | `[Completed]` | Orchestrator pipeline with Gemini/Groq & deterministic fallback heuristics |
+| **Supabase PostgreSQL Schema & RLS** | `[Completed]` | Migrations 001 & 002 with 10 tables, triggers, and RLS policies |
 | **Demo Scenarios & Simulation** | `[Completed]` | 5 pre-configured live cyberattack scenarios at `/api/v1/demo` |
-| **Next.js Web Portal UI** | `[Partial]` | Core security components, dashboard animations, and rich mock data |
-| **Kotlin Android App** | `[Partial]` | Project architecture, Gradle dependencies, and package structure setup |
+| **Next.js Web Portal UI** | `[Completed]` | 15 routes, dark cyberpunk UI, interactive radar scanner, charts, and API client |
+| **Kotlin Android App** | `[Completed]` | Complete Jetpack Compose architecture: 9 screens, 7 components, Room DB, VpnService |
+| **Docker & Deployment** | `[Completed]` | Production Dockerfiles for backend & frontend with `docker-compose.yml` |
 
 ---
 
@@ -52,7 +53,7 @@
 | **Message & SMS Analyzer** | `[Completed]` | `backend/app/services/message_analyzer.py` with categorized regex rules for Banking, UPI, KYC, Job, and Lottery scams. |
 | **Image & QR Analyzer** | `[Completed]` | `backend/app/services/image_analyzer.py` with PyZbar QR decoding, EXIF metadata inspection, and OCR heuristics. |
 | **Threat Intelligence Service** | `[Completed]` | `backend/app/services/threat_intel.py` with offline blacklists, Tor exit node ranges, and DNS checks. |
-| **ScamClassifier ML Pipeline** | `[Completed]` | `backend/app/ml/classifier.py` trained on 200+ samples using TF-IDF + Multinomial Naive Bayes across 7 categories. |
+| **ScamClassifier ML Pipeline** | `[Completed]` | `backend/app/ml/classifier.py` trained on 205 samples using TF-IDF + Multinomial Naive Bayes across 7 categories. Retrained and cached with zero warnings. |
 
 ---
 
@@ -95,8 +96,10 @@
 | **Rate Limiter (SlowAPI)** | `[Completed]` | Enforces 60 requests/minute per client IP address. |
 | **Structured Logging** | `[Completed]` | JSON-formatted logging via `structlog` with trace IDs and execution durations. |
 | **CORS Middleware** | `[Completed]` | Configurable origin whitelist supporting Next.js frontend and mobile clients. |
-| **Docker Compose** | `[Completed]` | Multi-container configuration for backend and frontend. |
-| **Supabase Cloud Project** | `[Needs Credentials]` | Requires configuring `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_KEY` in `.env`. |
+| **Docker Compose** | `[Completed]` | Multi-container configuration for backend and frontend (`docker-compose.yml`). |
+| **Backend Dockerfile** | `[Completed]` | Python 3.11 with `libzbar0` system dependency and uvicorn entrypoint. |
+| **Frontend Dockerfile** | `[Completed]` | Multi-stage Node 20 Alpine production build. |
+| **Supabase Cloud Project** | `[Needs Credentials]` | Optional production connection: add `SUPABASE_URL` and `SUPABASE_ANON_KEY` to `.env`. Built-in resilience mocks run seamlessly without credentials. |
 
 ---
 
@@ -104,13 +107,17 @@
 
 | Component | Status | Implementation Details |
 | :--- | :---: | :--- |
-| **Framework & Build Setup** | `[Completed]` | Next.js 16 with Turbopack, React 19, TypeScript 5, and Tailwind CSS. |
-| **Risk Gauge Component** | `[Completed]` | `frontend/src/components/dashboard/RiskGauge.tsx` visual dial for threat severity. |
-| **Scanner Animation** | `[Completed]` | `frontend/src/components/dashboard/ScannerAnimation.tsx` radar visualizer for live scanning. |
-| **Stat Card Component** | `[Completed]` | `frontend/src/components/dashboard/StatCard.tsx` for metric KPIs with trend indicators. |
-| **Trust Score Component** | `[Completed]` | `frontend/src/components/dashboard/TrustScore.tsx` multi-factor health dial. |
-| **Mock Telemetry Data** | `[Completed]` | `frontend/src/lib/mockData.ts` with 50+ investigations, devices, and event feeds. |
-| **Dashboard Page Integration** | `[Partial]` | UI widgets built; full wiring of page layout to live backend API endpoints in progress. |
+| **Framework & Build Setup** | `[Completed]` | Next.js 16 with Turbopack, React 19, TypeScript 5, and Tailwind CSS. Clean production builds. |
+| **Landing Page** | `[Completed]` | `frontend/src/app/page.tsx` with animated cyber shield SVG, 6 module cards, 4-step workflow, and stats. |
+| **Auth Flow** | `[Completed]` | Login, Signup, and Forgot-Password pages with dark theme and validation. |
+| **Security Overview** | `[Completed]` | `frontend/src/app/dashboard/page.tsx` with TrustScore dial, StatCards, ThreatDonutChart, and RiskTrend chart. |
+| **Threat Scanner** | `[Completed]` | `frontend/src/app/dashboard/scanner/page.tsx` supporting URL, SMS, Screenshot (OCR), and QR payloads with radar animation. |
+| **Investigations Hub** | `[Completed]` | List view with filtering (`/dashboard/investigations`) and deep-dive detail view (`/dashboard/investigations/[id]`). |
+| **Threat Intelligence** | `[Completed]` | Live IOC repository with categorisation, confidence scoring, and pattern signatures. |
+| **Device Security** | `[Completed]` | Device inventory, permission risk scoring, and network audit dashboard. |
+| **Threat Analytics** | `[Completed]` | 30-day trends, attack vector distributions, and multi-agent efficiency metrics. |
+| **Interactive Demo Mode** | `[Completed]` | `/dashboard/demo` with 1-click execution of 5 real-world attack scenarios. |
+| **Resilient API Client** | `[Completed]` | `frontend/src/lib/api.ts` connects to FastAPI backend with automatic rich mock fallback when offline. |
 
 ---
 
@@ -118,11 +125,15 @@
 
 | Component | Status | Implementation Details |
 | :--- | :---: | :--- |
-| **Gradle Build & Dependencies** | `[Completed]` | `android/app/build.gradle.kts` configured with Kotlin 1.9, Compose BOM, Retrofit, and OkHttp. |
-| **Project Directory Structure** | `[Completed]` | Package directories established for `data/api`, `data/local`, `ui/screens`, `services`, and `navigation`. |
-| **Retrofit Client & Models** | `[Partial]` | Architecture defined for connecting to FastAPI backend at `http://10.0.2.2:8000/`. |
-| **SMS BroadcastReceiver** | `[Partial]` | Background message interception hook for on-device threat evaluation. |
-| **Compose UI Screens** | `[Partial]` | Mobile scanner and threat notification screens in active development. |
+| **Gradle Build & Dependencies** | `[Completed]` | `android/app/build.gradle.kts` configured with Kotlin, Compose BOM, Retrofit, Room, ML Kit, CameraX. |
+| **Project Architecture** | `[Completed]` | Clean Architecture pattern: `data/api`, `data/local`, `data/repository`, `ui/screens`, `services`, `utils`. |
+| **Retrofit Client & Repositories** | `[Completed]` | `AegisosApi.kt`, `RetrofitClient.kt`, `ScanRepository.kt`, and `AuthRepository.kt`. |
+| **Room Local Database** | `[Completed]` | `AppDatabase.kt` caching scans and offline security events. |
+| **9 Jetpack Compose Screens** | `[Completed]` | HomeScreen, ScannerScreen, WebGuardScreen, MessageGuardScreen, MediaGuardScreen, AppGuardScreen, NetworkGuardScreen, InvestigationsScreen, SettingsScreen. |
+| **7 Security Components** | `[Completed]` | TrustScoreIndicator, RiskBadge, SecurityEventCard, ModuleCard, ScanResultCard, AnimatedShield, CommonComponents. |
+| **VpnService Prototype** | `[Completed]` | `AegisosVpnService.kt` for local VPN-based domain filtering architecture. |
+| **App Security Auditor** | `[Completed]` | `AppAuditor.kt` auditing installed applications for dangerous permission combinations. |
+| **ML Kit Vision & OCR** | `[Completed]` | `QrScanner.kt`, `OcrEngine.kt`, and `UrlExtractor.kt` utility modules. |
 
 ---
 
@@ -130,7 +141,7 @@
 
 | Test Suite | Status | Details |
 | :--- | :---: | :--- |
-| **URL Analyzer Unit Tests** | `[Completed]` | `backend/tests/test_url_analyzer.py` verifies SSRF blocks, homograph detection, and TLD checks. |
-| **Message Analyzer Unit Tests** | `[Completed]` | `backend/tests/test_message_analyzer.py` verifies banking, KYC, and UPI scam regex heuristics. |
-| **API Integration Tests** | `[Completed]` | `backend/tests/test_api.py` verifies scan endpoints, demo scenario runs, and rate limiting. |
-| **Automated Test Runner** | `[Needs Credentials]` | Run tests in activated virtual environment (`pytest backend/tests`). |
+| **URL Analyzer Unit Tests** | `[Completed]` | `backend/tests/test_url_analyzer.py` verifies SSRF blocks, homograph detection, and TLD checks (8/8 passing). |
+| **Message Analyzer Unit Tests** | `[Completed]` | `backend/tests/test_message_analyzer.py` verifies banking, KYC, and UPI scam regex heuristics (8/8 passing). |
+| **API Integration Tests** | `[Completed]` | `backend/tests/test_api.py` verifies scan endpoints, demo scenarios, analytics, devices, and rate limiting (8/8 passing). |
+| **Automated Test Runner** | `[Completed]` | 24/24 tests passing cleanly via `pytest tests -v` in Python 3.13 venv. |
